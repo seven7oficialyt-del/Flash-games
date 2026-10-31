@@ -1,0 +1,56 @@
+name: Convertir SWF a OpenFL
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - "*.swf"
+
+jobs:
+  convert:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - uses: krdlab/setup-haxe@v1
+        with:
+          haxe-version: 4.3.6
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Preparar haxelib
+        run: |
+          mkdir -p "$HOME/haxelib"
+          haxelib setup "$HOME/haxelib"
+
+      - name: Instalar FFDec y librerias de Haxe
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: python3 swf2openfl.py setup
+
+      - name: Comprobar que hay SWF
+        run: |
+          ls *.swf > /dev/null 2>&1 || { echo "Sube al menos un archivo .swf a la raiz del repositorio"; exit 1; }
+
+      - name: Analizar SWF
+        run: python3 swf2openfl.py info *.swf
+
+      - name: Convertir
+        env:
+          JAVA_TOOL_OPTIONS: -Djava.awt.headless=true
+        run: python3 swf2openfl.py convert *.swf -o out
+
+      - name: Subir resultado
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: proyectos-openfl
+          path: out/
+          if-no-files-found: warn
